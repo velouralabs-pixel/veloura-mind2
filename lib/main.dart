@@ -24,6 +24,194 @@ class VelouraMindApp extends StatelessWidget {
   }
 }
 
+class PlanData {
+  final List<String> topThree;
+  final List<String> laterThisWeek;
+  final List<String> delegate;
+  final List<String> letGo;
+  final String smallWin;
+
+  const PlanData({
+    required this.topThree,
+    required this.laterThisWeek,
+    required this.delegate,
+    required this.letGo,
+    required this.smallWin,
+  });
+}
+
+class SmartPlanService {
+  static PlanData buildPlan({
+    required String brainDumpText,
+    required String mood,
+    required String energy,
+    required String focus,
+  }) {
+    final tasks = brainDumpText
+        .split(RegExp(r'[\n,;]+'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (tasks.isEmpty) {
+      return const PlanData(
+        topThree: ['Write one thing that feels important today'],
+        laterThisWeek: ['Come back later and add more tasks'],
+        delegate: ['Ask for help if one task feels too heavy'],
+        letGo: ['You do not need to solve everything at once'],
+        smallWin: 'Take one small step for five minutes.',
+      );
+    }
+
+    final scored = tasks.map((task) {
+      return _ScoredTask(task, _scoreTask(task, mood, energy, focus));
+    }).toList()
+      ..sort((a, b) => b.score.compareTo(a.score));
+
+    final topThree = scored.take(3).map((item) => item.title).toList();
+    final topSet = topThree.toSet();
+
+    final laterThisWeek = tasks
+        .where((task) => !topSet.contains(task))
+        .where((task) => !_isDelegatable(task))
+        .take(5)
+        .toList();
+
+    final delegate = tasks
+        .where((task) => !topSet.contains(task))
+        .where(_isDelegatable)
+        .take(3)
+        .toList();
+
+    final letGo = <String>[
+      energy == 'Low'
+          ? 'Anything that is not urgent can wait until your energy is better.'
+          : 'You do not need to complete every task today.',
+    ];
+
+    final smallWin = _findSmallWin(tasks);
+
+    return PlanData(
+      topThree: topThree,
+      laterThisWeek:
+          laterThisWeek.isEmpty ? ['No extra tasks for this week yet'] : laterThisWeek,
+      delegate: delegate.isEmpty
+          ? ['Ask someone for help with one home or family task if possible']
+          : delegate,
+      letGo: letGo,
+      smallWin: smallWin,
+    );
+  }
+
+  static int _scoreTask(
+    String task,
+    String mood,
+    String energy,
+    String focus,
+  ) {
+    final lower = task.toLowerCase();
+    int score = 0;
+
+    final urgentWords = [
+      'pay',
+      'bill',
+      'rent',
+      'doctor',
+      'appointment',
+      'call',
+      'finish',
+      'presentation',
+      'due',
+      'school',
+      'work',
+      'medicine',
+      'insurance',
+    ];
+
+    for (final word in urgentWords) {
+      if (lower.contains(word)) score += 3;
+    }
+
+    if (focus == 'Money' &&
+        (lower.contains('pay') ||
+            lower.contains('bill') ||
+            lower.contains('rent'))) {
+      score += 4;
+    }
+
+    if (focus == 'Health' &&
+        (lower.contains('doctor') ||
+            lower.contains('medicine') ||
+            lower.contains('appointment'))) {
+      score += 4;
+    }
+
+    if (focus == 'Work' &&
+        (lower.contains('work') ||
+            lower.contains('presentation') ||
+            lower.contains('email'))) {
+      score += 4;
+    }
+
+    if (focus == 'Family' &&
+        (lower.contains('kids') ||
+            lower.contains('child') ||
+            lower.contains('school') ||
+            lower.contains('family'))) {
+      score += 4;
+    }
+
+    if (mood == 'Overwhelmed' || energy == 'Low') {
+      if (lower.contains('laundry') ||
+          lower.contains('clean') ||
+          lower.contains('organize')) {
+        score -= 2;
+      }
+    }
+
+    return score;
+  }
+
+  static bool _isDelegatable(String task) {
+    final lower = task.toLowerCase();
+
+    return lower.contains('groceries') ||
+        lower.contains('laundry') ||
+        lower.contains('clean') ||
+        lower.contains('pick up') ||
+        lower.contains('kids') ||
+        lower.contains('home');
+  }
+
+  static String _findSmallWin(List<String> tasks) {
+    for (final task in tasks) {
+      final lower = task.toLowerCase();
+
+      if (lower.contains('call')) {
+        return 'Make one quick phone call.';
+      }
+
+      if (lower.contains('pay')) {
+        return 'Pay one bill or set a reminder for it.';
+      }
+
+      if (lower.contains('laundry')) {
+        return 'Start one small load of laundry.';
+      }
+    }
+
+    return 'Spend five minutes starting the easiest task.';
+  }
+}
+
+class _ScoredTask {
+  final String title;
+  final int score;
+
+  const _ScoredTask(this.title, this.score);
+}
+
 class AppShell extends StatelessWidget {
   final Widget child;
 
@@ -67,7 +255,7 @@ class WelcomeScreen extends StatelessWidget {
                 width: 110,
                 height: 110,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7FAF8B).withOpacity(0.18),
+                  color: const Color(0xFF7FAF8B).withValues(alpha: 0.18),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -524,6 +712,13 @@ class YourPlanScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final plan = SmartPlanService.buildPlan(
+      brainDumpText: brainDumpText,
+      mood: mood,
+      energy: energy,
+      focus: focus,
+    );
+
     return AppShell(
       child: SafeArea(
         child: Padding(
@@ -556,41 +751,35 @@ class YourPlanScreen extends StatelessWidget {
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
-                    children: const [
+                    children: [
                       PlanCard(
                         icon: '⭐',
                         title: "Today's Top 3",
-                        items: [
-                          'Pay electric bill',
-                          'Call doctor',
-                          'Finish presentation',
-                        ],
+                        items: plan.topThree,
                       ),
-                      SizedBox(height: 14),
+                      const SizedBox(height: 14),
                       PlanCard(
                         icon: '📅',
                         title: 'Later This Week',
-                        items: [
-                          'Laundry',
-                          'Groceries',
-                          'Kids appointment',
-                        ],
+                        items: plan.laterThisWeek,
                       ),
-                      SizedBox(height: 14),
+                      const SizedBox(height: 14),
                       PlanCard(
                         icon: '🤝',
                         title: 'Delegate',
-                        items: [
-                          'Ask someone for help with one family or home task',
-                        ],
+                        items: plan.delegate,
                       ),
-                      SizedBox(height: 14),
+                      const SizedBox(height: 14),
                       PlanCard(
                         icon: '🌿',
                         title: 'Let Go For Now',
-                        items: [
-                          "You don't need to solve everything today.",
-                        ],
+                        items: plan.letGo,
+                      ),
+                      const SizedBox(height: 14),
+                      PlanCard(
+                        icon: '🏆',
+                        title: 'One Small Win',
+                        items: [plan.smallWin],
                       ),
                     ],
                   ),
@@ -603,7 +792,7 @@ class YourPlanScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const PlannerScreen(),
+                      builder: (_) => PlannerScreen(tasks: plan.topThree),
                     ),
                   );
                 },
@@ -617,34 +806,32 @@ class YourPlanScreen extends StatelessWidget {
 }
 
 class PlannerScreen extends StatefulWidget {
-  const PlannerScreen({super.key});
+  final List<String> tasks;
+
+  const PlannerScreen({
+    super.key,
+    required this.tasks,
+  });
 
   @override
   State<PlannerScreen> createState() => _PlannerScreenState();
 }
 
 class _PlannerScreenState extends State<PlannerScreen> {
-  final List<String> taskTitles = [
-    'Pay electric bill',
-    'Call doctor',
-    'Finish presentation',
-  ];
+  late List<bool> completed;
 
-  final List<String> taskTimes = [
-    'Morning',
-    'Afternoon',
-    'Evening',
-  ];
-
-  final List<bool> completed = [
-    false,
-    false,
-    false,
-  ];
+  @override
+  void initState() {
+    super.initState();
+    completed = List.generate(widget.tasks.length, (_) => false);
+  }
 
   int get completedCount => completed.where((task) => task).length;
 
-  double get progress => completedCount / completed.length;
+  double get progress {
+    if (completed.isEmpty) return 0;
+    return completedCount / completed.length;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -711,8 +898,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
               const SizedBox(height: 18),
               Expanded(
                 child: ListView.separated(
-                  itemCount: taskTitles.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemCount: widget.tasks.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 14),
                   itemBuilder: (context, index) {
                     return AppCard(
                       child: Row(
@@ -728,29 +916,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  taskTitles[index],
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF2F3A35),
-                                    decoration: completed[index]
-                                        ? TextDecoration.lineThrough
-                                        : TextDecoration.none,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  taskTimes[index],
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF6F7A73),
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              widget.tasks[index],
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF2F3A35),
+                                decoration: completed[index]
+                                    ? TextDecoration.lineThrough
+                                    : TextDecoration.none,
+                              ),
                             ),
                           ),
                         ],
@@ -1116,7 +1291,7 @@ class ChoiceItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF7FAF8B).withOpacity(0.18)
+              ? const Color(0xFF7FAF8B).withValues(alpha: 0.18)
               : const Color(0xFFFAF8F3),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
@@ -1156,7 +1331,7 @@ class InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: const Color(0xFF7FAF8B).withOpacity(0.15),
+        color: const Color(0xFF7FAF8B).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -1277,7 +1452,7 @@ class AppCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
