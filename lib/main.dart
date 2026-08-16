@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const VelouraMindApp());
@@ -38,6 +39,65 @@ class PlanData {
     required this.letGo,
     required this.smallWin,
   });
+}
+
+class LastSession {
+  final String mood;
+  final String energy;
+  final String focus;
+  final String brainDumpText;
+
+  const LastSession({
+    required this.mood,
+    required this.energy,
+    required this.focus,
+    required this.brainDumpText,
+  });
+}
+
+class LocalHistoryService {
+  static const String moodKey = 'last_mood';
+  static const String energyKey = 'last_energy';
+  static const String focusKey = 'last_focus';
+  static const String brainDumpKey = 'last_brain_dump';
+
+  static Future<void> saveSession({
+    required String mood,
+    required String energy,
+    required String focus,
+    required String brainDumpText,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString(moodKey, mood);
+    await prefs.setString(energyKey, energy);
+    await prefs.setString(focusKey, focus);
+    await prefs.setString(brainDumpKey, brainDumpText);
+  }
+
+  static Future<LastSession?> loadSession() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final mood = prefs.getString(moodKey);
+    final energy = prefs.getString(energyKey);
+    final focus = prefs.getString(focusKey);
+    final brainDumpText = prefs.getString(brainDumpKey);
+
+    if (mood == null ||
+        energy == null ||
+        focus == null ||
+        brainDumpText == null ||
+        brainDumpText.trim().isEmpty) {
+      return null;
+    }
+
+    return LastSession(
+      mood: mood,
+      energy: energy,
+      focus: focus,
+      brainDumpText: brainDumpText,
+    );
+  }
 }
 
 class SmartPlanService {
@@ -90,17 +150,16 @@ class SmartPlanService {
           : 'You do not need to complete every task today.',
     ];
 
-    final smallWin = _findSmallWin(tasks);
-
     return PlanData(
       topThree: topThree,
-      laterThisWeek:
-          laterThisWeek.isEmpty ? ['No extra tasks for this week yet'] : laterThisWeek,
+      laterThisWeek: laterThisWeek.isEmpty
+          ? ['No extra tasks for this week yet']
+          : laterThisWeek,
       delegate: delegate.isEmpty
           ? ['Ask someone for help with one home or family task if possible']
           : delegate,
       letGo: letGo,
-      smallWin: smallWin,
+      smallWin: _findSmallWin(tasks),
     );
   }
 
@@ -127,16 +186,23 @@ class SmartPlanService {
       'work',
       'medicine',
       'insurance',
+      'email',
+      'phone',
+      'meeting',
+      'kids',
     ];
 
     for (final word in urgentWords) {
-      if (lower.contains(word)) score += 3;
+      if (lower.contains(word)) {
+        score += 3;
+      }
     }
 
     if (focus == 'Money' &&
         (lower.contains('pay') ||
             lower.contains('bill') ||
-            lower.contains('rent'))) {
+            lower.contains('rent') ||
+            lower.contains('phone'))) {
       score += 4;
     }
 
@@ -150,7 +216,8 @@ class SmartPlanService {
     if (focus == 'Work' &&
         (lower.contains('work') ||
             lower.contains('presentation') ||
-            lower.contains('email'))) {
+            lower.contains('email') ||
+            lower.contains('meeting'))) {
       score += 4;
     }
 
@@ -181,7 +248,8 @@ class SmartPlanService {
         lower.contains('clean') ||
         lower.contains('pick up') ||
         lower.contains('kids') ||
-        lower.contains('home');
+        lower.contains('home') ||
+        lower.contains('organize');
   }
 
   static String _findSmallWin(List<String> tasks) {
@@ -198,6 +266,10 @@ class SmartPlanService {
 
       if (lower.contains('laundry')) {
         return 'Start one small load of laundry.';
+      }
+
+      if (lower.contains('email')) {
+        return 'Send or answer one important email.';
       }
     }
 
@@ -316,11 +388,54 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              const ContinueLastPlanButton(),
               const SizedBox(height: 20),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class ContinueLastPlanButton extends StatelessWidget {
+  const ContinueLastPlanButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<LastSession?>(
+      future: LocalHistoryService.loadSession(),
+      builder: (context, snapshot) {
+        final session = snapshot.data;
+
+        if (session == null) {
+          return const SizedBox.shrink();
+        }
+
+        return TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => YourPlanScreen(
+                  mood: session.mood,
+                  energy: session.energy,
+                  focus: session.focus,
+                  brainDumpText: session.brainDumpText,
+                ),
+              ),
+            );
+          },
+          child: const Text(
+            'Continue Last Plan',
+            style: TextStyle(
+              color: Color(0xFF2F3A35),
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -502,17 +617,28 @@ class _BrainDumpScreenState extends State<BrainDumpScreen> {
   }
 
   void goToThinkingScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AIThinkingScreen(
-          mood: widget.mood,
-          energy: widget.energy,
-          focus: widget.focus,
-          brainDumpText: controller.text.trim(),
+    final text = controller.text.trim();
+
+    LocalHistoryService.saveSession(
+      mood: widget.mood,
+      energy: widget.energy,
+      focus: widget.focus,
+      brainDumpText: text,
+    ).then((_) {
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AIThinkingScreen(
+            mood: widget.mood,
+            energy: widget.energy,
+            focus: widget.focus,
+            brainDumpText: text,
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   @override
