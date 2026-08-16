@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const Color cream = Color(0xFFFAF8F3);
+const Color sage = Color(0xFF7FAF8B);
+const Color darkText = Color(0xFF2F3A35);
+const Color softText = Color(0xFF6F7A73);
+const Color borderColor = Color(0xFFE5E0D6);
+const Color disabledColor = Color(0xFFD8DED8);
+
 void main() {
   runApp(const VelouraMindApp());
 }
@@ -15,10 +22,8 @@ class VelouraMindApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFAF8F3),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7FAF8B),
-        ),
+        scaffoldBackgroundColor: cream,
+        colorScheme: ColorScheme.fromSeed(seedColor: sage),
       ),
       home: const WelcomeScreen(),
     );
@@ -144,12 +149,6 @@ class SmartPlanService {
         .take(3)
         .toList();
 
-    final letGo = <String>[
-      energy == 'Low'
-          ? 'Anything that is not urgent can wait until your energy is better.'
-          : 'You do not need to complete every task today.',
-    ];
-
     return PlanData(
       topThree: topThree,
       laterThisWeek: laterThisWeek.isEmpty
@@ -158,7 +157,11 @@ class SmartPlanService {
       delegate: delegate.isEmpty
           ? ['Ask someone for help with one home or family task if possible']
           : delegate,
-      letGo: letGo,
+      letGo: [
+        energy == 'Low'
+            ? 'Anything that is not urgent can wait until your energy is better.'
+            : 'You do not need to complete every task today.',
+      ],
       smallWin: _findSmallWin(tasks),
     );
   }
@@ -292,7 +295,7 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF8F3),
+      backgroundColor: cream,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final width =
@@ -327,7 +330,7 @@ class WelcomeScreen extends StatelessWidget {
                 width: 110,
                 height: 110,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7FAF8B).withValues(alpha: 0.18),
+                  color: sage.withValues(alpha: 0.18),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -341,7 +344,7 @@ class WelcomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 12),
@@ -352,7 +355,7 @@ class WelcomeScreen extends StatelessWidget {
                   fontSize: 26,
                   height: 1.25,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 18),
@@ -362,7 +365,7 @@ class WelcomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.5,
-                  color: Color(0xFF6F7A73),
+                  color: softText,
                 ),
               ),
               const Spacer(),
@@ -372,7 +375,7 @@ class WelcomeScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const MorningResetScreen(),
+                      builder: (_) => const HomeDashboardScreen(),
                     ),
                   );
                 },
@@ -383,7 +386,7 @@ class WelcomeScreen extends StatelessWidget {
                 child: const Text(
                   'I already have an account',
                   style: TextStyle(
-                    color: Color(0xFF2F3A35),
+                    color: darkText,
                     fontSize: 15,
                   ),
                 ),
@@ -429,13 +432,261 @@ class ContinueLastPlanButton extends StatelessWidget {
           child: const Text(
             'Continue Last Plan',
             style: TextStyle(
-              color: Color(0xFF2F3A35),
+              color: darkText,
               fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class HomeDashboardScreen extends StatelessWidget {
+  const HomeDashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShell(
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: FutureBuilder<LastSession?>(
+            future: LocalHistoryService.loadSession(),
+            builder: (context, snapshot) {
+              final session = snapshot.data;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  BackButton(
+                    color: darkText,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Good morning, Primene 🌿',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Let’s create a lighter, calmer day.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: softText,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          AppCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Today’s Focus',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: darkText,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  session == null
+                                      ? 'Start a reset to find your focus for today.'
+                                      : 'Last focus: ${session.focus}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.4,
+                                    color: softText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          AppCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Quick Actions',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: darkText,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                DashboardAction(
+                                  icon: '🌅',
+                                  title: 'Start New Reset',
+                                  subtitle:
+                                      'Check in with your mood, energy, and focus.',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const MorningResetScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                DashboardAction(
+                                  icon: '🧠',
+                                  title: 'Quick Brain Dump',
+                                  subtitle:
+                                      'Empty your mind fast and organize later.',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const BrainDumpScreen(
+                                          mood: 'Okay',
+                                          energy: 'Medium',
+                                          focus: 'Personal',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                DashboardAction(
+                                  icon: '✨',
+                                  title: 'Continue Last Plan',
+                                  subtitle: session == null
+                                      ? 'No saved plan yet.'
+                                      : 'Open your last saved plan.',
+                                  onTap: session == null
+                                      ? null
+                                      : () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => YourPlanScreen(
+                                                mood: session.mood,
+                                                energy: session.energy,
+                                                focus: session.focus,
+                                                brainDumpText:
+                                                    session.brainDumpText,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          AppCard(
+                            child: const Text(
+                              'Small reminder: you do not need to fix everything today. Start with one clear step.',
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.45,
+                                color: darkText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  PrimaryButton(
+                    text: 'Start New Reset',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MorningResetScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DashboardAction extends StatelessWidget {
+  final String icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  const DashboardAction({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDisabled = onTap == null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDisabled ? const Color(0xFFE7EEE7) : cream,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 28)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDisabled ? const Color(0xFF9A9A9A) : darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: isDisabled ? const Color(0xFF9A9A9A) : softText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: isDisabled ? const Color(0xFFB8B8B8) : sage,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -488,7 +739,7 @@ class _MorningResetScreenState extends State<MorningResetScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               BackButton(
-                color: const Color(0xFF2F3A35),
+                color: darkText,
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(height: 8),
@@ -497,16 +748,13 @@ class _MorningResetScreenState extends State<MorningResetScreen> {
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 "Let's make today feel lighter.",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6F7A73),
-                ),
+                style: TextStyle(fontSize: 16, color: softText),
               ),
               const SizedBox(height: 22),
               Expanded(
@@ -651,7 +899,7 @@ class _BrainDumpScreenState extends State<BrainDumpScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               BackButton(
-                color: const Color(0xFF2F3A35),
+                color: darkText,
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(height: 8),
@@ -660,16 +908,13 @@ class _BrainDumpScreenState extends State<BrainDumpScreen> {
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 "Write everything. Don't organize it. Just empty your mind.",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6F7A73),
-                ),
+                style: TextStyle(fontSize: 16, color: softText),
               ),
               const SizedBox(height: 18),
               Wrap(
@@ -689,7 +934,7 @@ class _BrainDumpScreenState extends State<BrainDumpScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFFE5E0D6)),
+                    border: Border.all(color: borderColor),
                   ),
                   child: TextField(
                     controller: controller,
@@ -706,7 +951,7 @@ class _BrainDumpScreenState extends State<BrainDumpScreen> {
                     style: const TextStyle(
                       fontSize: 16,
                       height: 1.5,
-                      color: Color(0xFF2F3A35),
+                      color: darkText,
                     ),
                   ),
                 ),
@@ -724,7 +969,7 @@ class _BrainDumpScreenState extends State<BrainDumpScreen> {
                   child: const Text(
                     'Save Draft',
                     style: TextStyle(
-                      color: Color(0xFF2F3A35),
+                      color: darkText,
                       fontSize: 15,
                     ),
                   ),
@@ -795,7 +1040,7 @@ class _AIThinkingScreenState extends State<AIThinkingScreen> {
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               SizedBox(height: 14),
@@ -805,7 +1050,7 @@ class _AIThinkingScreenState extends State<AIThinkingScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.5,
-                  color: Color(0xFF6F7A73),
+                  color: softText,
                 ),
               ),
               SizedBox(height: 32),
@@ -853,7 +1098,7 @@ class YourPlanScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               BackButton(
-                color: const Color(0xFF2F3A35),
+                color: darkText,
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(height: 8),
@@ -862,7 +1107,7 @@ class YourPlanScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 8),
@@ -870,7 +1115,7 @@ class YourPlanScreen extends StatelessWidget {
                 'Mood: $mood • Energy: $energy • Focus: $focus',
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF6F7A73),
+                  color: softText,
                 ),
               ),
               const SizedBox(height: 20),
@@ -969,7 +1214,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               BackButton(
-                color: const Color(0xFF2F3A35),
+                color: darkText,
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(height: 8),
@@ -978,16 +1223,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Focus on your top three. One step at a time.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6F7A73),
-                ),
+                style: TextStyle(fontSize: 16, color: softText),
               ),
               const SizedBox(height: 24),
               AppCard(
@@ -999,7 +1241,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2F3A35),
+                        color: darkText,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -1008,14 +1250,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       minHeight: 12,
                       borderRadius: BorderRadius.circular(99),
                       backgroundColor: const Color(0xFFE7EEE7),
-                      color: const Color(0xFF7FAF8B),
+                      color: sage,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       '$completedCount of ${completed.length} tasks completed',
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF6F7A73),
+                        color: softText,
                       ),
                     ),
                   ],
@@ -1033,7 +1275,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         children: [
                           Checkbox(
                             value: completed[index],
-                            activeColor: const Color(0xFF7FAF8B),
+                            activeColor: sage,
                             onChanged: (value) {
                               setState(() {
                                 completed[index] = value ?? false;
@@ -1047,7 +1289,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2F3A35),
+                                color: darkText,
                                 decoration: completed[index]
                                     ? TextDecoration.lineThrough
                                     : TextDecoration.none,
@@ -1132,7 +1374,7 @@ class _EveningReflectionScreenState extends State<EveningReflectionScreen> {
             style: const TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2F3A35),
+              color: darkText,
             ),
           ),
           const SizedBox(height: 12),
@@ -1144,19 +1386,19 @@ class _EveningReflectionScreenState extends State<EveningReflectionScreen> {
               hintText: hint,
               hintStyle: const TextStyle(color: Color(0xFF9A9A9A)),
               filled: true,
-              fillColor: const Color(0xFFFAF8F3),
+              fillColor: cream,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: Color(0xFFE5E0D6)),
+                borderSide: const BorderSide(color: borderColor),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: Color(0xFFE5E0D6)),
+                borderSide: const BorderSide(color: borderColor),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
                 borderSide: const BorderSide(
-                  color: Color(0xFF7FAF8B),
+                  color: sage,
                   width: 2,
                 ),
               ),
@@ -1177,7 +1419,7 @@ class _EveningReflectionScreenState extends State<EveningReflectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               BackButton(
-                color: const Color(0xFF2F3A35),
+                color: darkText,
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(height: 8),
@@ -1186,7 +1428,7 @@ class _EveningReflectionScreenState extends State<EveningReflectionScreen> {
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1194,7 +1436,7 @@ class _EveningReflectionScreenState extends State<EveningReflectionScreen> {
                 'You completed ${widget.completedCount} of ${widget.totalTasks} top tasks today.',
                 style: const TextStyle(
                   fontSize: 16,
-                  color: Color(0xFF6F7A73),
+                  color: softText,
                 ),
               ),
               const SizedBox(height: 20),
@@ -1259,10 +1501,7 @@ class DayCompleteScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              const Text(
-                '🌿',
-                style: TextStyle(fontSize: 78),
-              ),
+              const Text('🌿', style: TextStyle(fontSize: 78)),
               const SizedBox(height: 24),
               const Text(
                 'Day Complete',
@@ -1270,7 +1509,7 @@ class DayCompleteScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2F3A35),
+                  color: darkText,
                 ),
               ),
               const SizedBox(height: 14),
@@ -1280,7 +1519,7 @@ class DayCompleteScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   height: 1.4,
-                  color: Color(0xFF6F7A73),
+                  color: softText,
                 ),
               ),
               const SizedBox(height: 28),
@@ -1291,7 +1530,7 @@ class DayCompleteScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     height: 1.5,
-                    color: Color(0xFF2F3A35),
+                    color: darkText,
                   ),
                 ),
               ),
@@ -1337,8 +1576,8 @@ class PrimaryButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: enabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF7FAF8B),
-          disabledBackgroundColor: const Color(0xFFD8DED8),
+          backgroundColor: sage,
+          disabledBackgroundColor: disabledColor,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -1378,7 +1617,7 @@ class QuestionCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2F3A35),
+              color: darkText,
             ),
           ),
           const SizedBox(height: 16),
@@ -1416,14 +1655,10 @@ class ChoiceItem extends StatelessWidget {
         width: 98,
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF7FAF8B).withValues(alpha: 0.18)
-              : const Color(0xFFFAF8F3),
+          color: isSelected ? sage.withValues(alpha: 0.18) : cream,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFF7FAF8B)
-                : const Color(0xFFE5E0D6),
+            color: isSelected ? sage : borderColor,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -1437,7 +1672,7 @@ class ChoiceItem extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF2F3A35),
+                color: darkText,
               ),
             ),
           ],
@@ -1457,13 +1692,13 @@ class InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: const Color(0xFF7FAF8B).withValues(alpha: 0.15),
+        color: sage.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: Color(0xFF2F3A35),
+          color: darkText,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -1483,17 +1718,14 @@ class ThinkingStep extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          const Icon(
-            Icons.check_circle,
-            color: Color(0xFF7FAF8B),
-          ),
+          const Icon(Icons.check_circle, color: sage),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
                 fontSize: 16,
-                color: Color(0xFF2F3A35),
+                color: darkText,
               ),
             ),
           ),
@@ -1526,7 +1758,7 @@ class PlanCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2F3A35),
+              color: darkText,
             ),
           ),
           const SizedBox(height: 12),
@@ -1540,7 +1772,7 @@ class PlanCard extends StatelessWidget {
                     '• ',
                     style: TextStyle(
                       fontSize: 18,
-                      color: Color(0xFF7FAF8B),
+                      color: sage,
                     ),
                   ),
                   Expanded(
@@ -1549,7 +1781,7 @@ class PlanCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15,
                         height: 1.35,
-                        color: Color(0xFF2F3A35),
+                        color: darkText,
                       ),
                     ),
                   ),
