@@ -372,29 +372,94 @@ class WelcomeScreen extends StatelessWidget {
               PrimaryButton(
                 text: 'Get Started',
                 onPressed: () {
-                  Navigator.push(
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const HomeDashboardScreen(),
+                      builder: (_) => const MainNavigationScreen(),
                     ),
                   );
                 },
               ),
               const SizedBox(height: 18),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'I already have an account',
-                  style: TextStyle(
-                    color: darkText,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
               const ContinueLastPlanButton(),
               const SizedBox(height: 20),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
+
+  @override
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int selectedIndex = 0;
+
+  void changeTab(int index) {
+    setState(() {
+      selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      const HomeDashboardContent(),
+      const ResetTabContent(),
+      const HistoryTabContent(),
+      const ProfileTabContent(),
+    ];
+
+    return AppShell(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Expanded(child: pages[selectedIndex]),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(color: borderColor),
+                ),
+              ),
+              child: NavigationBar(
+                selectedIndex: selectedIndex,
+                onDestinationSelected: changeTab,
+                backgroundColor: Colors.white,
+                indicatorColor: sage.withValues(alpha: 0.18),
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.refresh_outlined),
+                    selectedIcon: Icon(Icons.refresh),
+                    label: 'Reset',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.history_outlined),
+                    selectedIcon: Icon(Icons.history),
+                    label: 'History',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: 'Profile',
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -443,183 +508,476 @@ class ContinueLastPlanButton extends StatelessWidget {
   }
 }
 
-class HomeDashboardScreen extends StatelessWidget {
-  const HomeDashboardScreen({super.key});
+class HomeDashboardContent extends StatelessWidget {
+  const HomeDashboardContent({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return AppShell(
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: FutureBuilder<LastSession?>(
-            future: LocalHistoryService.loadSession(),
-            builder: (context, snapshot) {
-              final session = snapshot.data;
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: FutureBuilder<LastSession?>(
+        future: LocalHistoryService.loadSession(),
+        builder: (context, snapshot) {
+          final session = snapshot.data;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  BackButton(
-                    color: darkText,
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Good morning, Primene 🌿',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: darkText,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Let’s create a lighter, calmer day.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: softText,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          AppCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Today’s Focus',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: darkText,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  session == null
-                                      ? 'Start a reset to find your focus for today.'
-                                      : 'Last focus: ${session.focus}',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    height: 1.4,
-                                    color: softText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          AppCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Quick Actions',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: darkText,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                DashboardAction(
-                                  icon: '🌅',
-                                  title: 'Start New Reset',
-                                  subtitle:
-                                      'Check in with your mood, energy, and focus.',
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const MorningResetScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                DashboardAction(
-                                  icon: '🧠',
-                                  title: 'Quick Brain Dump',
-                                  subtitle:
-                                      'Empty your mind fast and organize later.',
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const BrainDumpScreen(
-                                          mood: 'Okay',
-                                          energy: 'Medium',
-                                          focus: 'Personal',
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                DashboardAction(
-                                  icon: '✨',
-                                  title: 'Continue Last Plan',
-                                  subtitle: session == null
-                                      ? 'No saved plan yet.'
-                                      : 'Open your last saved plan.',
-                                  onTap: session == null
-                                      ? null
-                                      : () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => YourPlanScreen(
-                                                mood: session.mood,
-                                                energy: session.energy,
-                                                focus: session.focus,
-                                                brainDumpText:
-                                                    session.brainDumpText,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          AppCard(
-                            child: const Text(
-                              'Small reminder: you do not need to fix everything today. Start with one clear step.',
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              const Text(
+                'Good morning, Primene 🌿',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: darkText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Let’s create a lighter, calmer day.',
+                style: TextStyle(fontSize: 16, color: softText),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Today’s Focus',
                               style: TextStyle(
-                                fontSize: 15,
-                                height: 1.45,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                                 color: darkText,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            Text(
+                              session == null
+                                  ? 'Start a reset to find your focus for today.'
+                                  : 'Last focus: ${session.focus}',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                height: 1.4,
+                                color: softText,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 18),
+                      AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Quick Actions',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: darkText,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            DashboardAction(
+                              icon: '🌅',
+                              title: 'Start New Reset',
+                              subtitle:
+                                  'Check in with your mood, energy, and focus.',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MorningResetScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            DashboardAction(
+                              icon: '🧠',
+                              title: 'Quick Brain Dump',
+                              subtitle:
+                                  'Empty your mind fast and organize later.',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const BrainDumpScreen(
+                                      mood: 'Okay',
+                                      energy: 'Medium',
+                                      focus: 'Personal',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            DashboardAction(
+                              icon: '✨',
+                              title: 'Continue Last Plan',
+                              subtitle: session == null
+                                  ? 'No saved plan yet.'
+                                  : 'Open your last saved plan.',
+                              onTap: session == null
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => YourPlanScreen(
+                                            mood: session.mood,
+                                            energy: session.energy,
+                                            focus: session.focus,
+                                            brainDumpText:
+                                                session.brainDumpText,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      AppCard(
+                        child: const Text(
+                          'Small reminder: you do not need to fix everything today. Start with one clear step.',
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.45,
+                            color: darkText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              PrimaryButton(
+                text: 'Start New Reset',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MorningResetScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ResetTabContent extends StatelessWidget {
+  const ResetTabContent({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          const Text(
+            'Reset Center 🌿',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Choose how you want to clear your mind today.',
+            style: TextStyle(fontSize: 16, color: softText),
+          ),
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              children: [
+                DashboardAction(
+                  icon: '🌅',
+                  title: 'Guided Morning Reset',
+                  subtitle: 'Mood, energy, focus, brain dump, and plan.',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MorningResetScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                DashboardAction(
+                  icon: '🧠',
+                  title: 'Quick Brain Dump',
+                  subtitle: 'Skip the check-in and empty your mind now.',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BrainDumpScreen(
+                          mood: 'Okay',
+                          energy: 'Medium',
+                          focus: 'Personal',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          AppCard(
+            child: const Text(
+              'Best for overwhelmed days: start with the guided reset. Best for busy days: use quick brain dump.',
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                color: darkText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HistoryTabContent extends StatelessWidget {
+  const HistoryTabContent({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: FutureBuilder<LastSession?>(
+        future: LocalHistoryService.loadSession(),
+        builder: (context, snapshot) {
+          final session = snapshot.data;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              const Text(
+                'History 📚',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: darkText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Your most recent saved reset.',
+                style: TextStyle(fontSize: 16, color: softText),
+              ),
+              const SizedBox(height: 24),
+              if (session == null)
+                AppCard(
+                  child: const Text(
+                    'No saved history yet. Complete one Brain Dump and your last plan will show here.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.45,
+                      color: softText,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  PrimaryButton(
-                    text: 'Start New Reset',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const MorningResetScreen(),
+                )
+              else ...[
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Last Saved Plan',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: darkText,
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(height: 12),
+                      InfoChip(label: 'Mood: ${session.mood}'),
+                      const SizedBox(height: 8),
+                      InfoChip(label: 'Energy: ${session.energy}'),
+                      const SizedBox(height: 8),
+                      InfoChip(label: 'Focus: ${session.focus}'),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Brain Dump',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        session.brainDumpText,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          color: softText,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              );
-            },
+                ),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  text: 'Open Last Plan',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => YourPlanScreen(
+                          mood: session.mood,
+                          energy: session.energy,
+                          focus: session.focus,
+                          brainDumpText: session.brainDumpText,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ProfileTabContent extends StatelessWidget {
+  const ProfileTabContent({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          const Text(
+            'Profile 👤',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your Veloura Mind settings.',
+            style: TextStyle(fontSize: 16, color: softText),
+          ),
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Primene',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: darkText,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Goal: turn overwhelm into calm daily action.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.4,
+                    color: softText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          AppCard(
+            child: Column(
+              children: const [
+                ProfileRow(
+                  icon: '🌿',
+                  title: 'App Version',
+                  value: 'MVP 1.0',
+                ),
+                SizedBox(height: 14),
+                ProfileRow(
+                  icon: '💾',
+                  title: 'Storage',
+                  value: 'Local history enabled',
+                ),
+                SizedBox(height: 14),
+                ProfileRow(
+                  icon: '✨',
+                  title: 'AI Plan',
+                  value: 'Smart sorting enabled',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ProfileRow extends StatelessWidget {
+  final String icon;
+  final String title;
+  final String value;
+
+  const ProfileRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(icon, style: const TextStyle(fontSize: 24)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
           ),
         ),
-      ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            color: softText,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1536,12 +1894,12 @@ class DayCompleteScreen extends StatelessWidget {
               ),
               const Spacer(),
               PrimaryButton(
-                text: 'Back to Start',
+                text: 'Back to Home',
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const WelcomeScreen(),
+                      builder: (_) => const MainNavigationScreen(),
                     ),
                     (route) => false,
                   );
