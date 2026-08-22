@@ -62,6 +62,20 @@ class LastSession {
   });
 }
 
+class DailyStats {
+  final int currentStreak;
+  final int totalResets;
+  final int completedDays;
+  final DateTime? lastUsedDate;
+
+  const DailyStats({
+    required this.currentStreak,
+    required this.totalResets,
+    required this.completedDays,
+    required this.lastUsedDate,
+  });
+}
+
 class SavedPlanEntry {
   final String id;
   final DateTime createdAt;
@@ -112,6 +126,11 @@ class LocalHistoryService {
   static const String historyKey = 'saved_plan_history';
   static const String plannerProgressPrefix = 'planner_progress_';
 
+  static const String dailyUseDatesKey = 'daily_use_dates';
+  static const String totalResetCountKey = 'total_reset_count';
+  static const String completedDayCountKey = 'completed_day_count';
+  static const String lastUsedDateKey = 'last_used_date';
+
   static Future<void> saveSession({
     required String mood,
     required String energy,
@@ -132,6 +151,8 @@ class LocalHistoryService {
       focus: focus,
       brainDumpText: brainDumpText,
     );
+
+    await markDailyUse();
   }
 
   static Future<LastSession?> loadSession() async {
@@ -176,6 +197,11 @@ class LocalHistoryService {
     await prefs.remove(energyKey);
     await prefs.remove(focusKey);
     await prefs.remove(brainDumpKey);
+
+    await prefs.remove(dailyUseDatesKey);
+    await prefs.remove(totalResetCountKey);
+    await prefs.remove(completedDayCountKey);
+    await prefs.remove(lastUsedDateKey);
 
     final keys = prefs.getKeys();
 
@@ -226,10 +252,66 @@ class LocalHistoryService {
     ];
   }
 
+  static Future<void> markDailyUse() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = _dateOnly(DateTime.now());
+
+    final dates = prefs.getStringList(dailyUseDatesKey) ?? [];
+
+    if (!dates.contains(today)) {
+      dates.add(today);
+      await prefs.setStringList(dailyUseDatesKey, dates);
+    }
+
+    final totalResets = prefs.getInt(totalResetCountKey) ?? 0;
+    await prefs.setInt(totalResetCountKey, totalResets + 1);
+    await prefs.setString(lastUsedDateKey, DateTime.now().toIso8601String());
+  }
+
+  static Future<void> markDayCompleted() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completedDays = prefs.getInt(completedDayCountKey) ?? 0;
+
+    await prefs.setInt(completedDayCountKey, completedDays + 1);
+    await markDailyUse();
+  }
+
+  static Future<DailyStats> loadDailyStats() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final dates = prefs.getStringList(dailyUseDatesKey) ?? [];
+    final dateSet = dates.toSet();
+
+    int streak = 0;
+    DateTime cursor = DateTime.now();
+
+    while (dateSet.contains(_dateOnly(cursor))) {
+      streak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+
+    final lastUsedRaw = prefs.getString(lastUsedDateKey);
+
+    return DailyStats(
+      currentStreak: streak,
+      totalResets: prefs.getInt(totalResetCountKey) ?? 0,
+      completedDays: prefs.getInt(completedDayCountKey) ?? 0,
+      lastUsedDate: DateTime.tryParse(lastUsedRaw ?? ''),
+    );
+  }
+
   static String _plannerProgressKey(List<String> tasks) {
     final taskText = jsonEncode(tasks);
     final encoded = base64Url.encode(utf8.encode(taskText));
     return '$plannerProgressPrefix$encoded';
+  }
+
+  static String _dateOnly(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+
+    return '$year-$month-$day';
   }
 
   static Future<void> _addToHistory({
@@ -751,6 +833,8 @@ class HomeDashboardContent extends StatelessWidget {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
+                      const DailyStatsCard(),
+                      const SizedBox(height: 18),
                       AppCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1124,89 +1208,148 @@ class ProfileTabContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 10),
-          const Text(
-            'Profile 👤',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.bold,
-              color: darkText,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 10),
+            const Text(
+              'Profile 👤',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: darkText,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your Veloura Mind settings.',
-            style: TextStyle(fontSize: 16, color: softText),
-          ),
-          const SizedBox(height: 24),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Primene',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: darkText,
+            const SizedBox(height: 8),
+            const Text(
+              'Your Veloura Mind settings.',
+              style: TextStyle(fontSize: 16, color: softText),
+            ),
+            const SizedBox(height: 24),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Primene',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: darkText,
+                    ),
                   ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Goal: turn overwhelm into calm daily action.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.4,
-                    color: softText,
+                  SizedBox(height: 8),
+                  Text(
+                    'Goal: turn overwhelm into calm daily action.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      color: softText,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          AppCard(
-            child: Column(
-              children: const [
-                ProfileRow(
-                  icon: '🌿',
-                  title: 'App Version',
-                  value: 'MVP 1.2',
-                ),
-                SizedBox(height: 14),
-                ProfileRow(
-                  icon: '💾',
-                  title: 'Storage',
-                  value: 'History + progress enabled',
-                ),
-                SizedBox(height: 14),
-                ProfileRow(
-                  icon: '✨',
-                  title: 'AI Plan',
-                  value: 'Smart sorting enabled',
-                ),
-              ],
+            const SizedBox(height: 18),
+            AppCard(
+              child: Column(
+                children: const [
+                  ProfileRow(
+                    icon: '🌿',
+                    title: 'App Version',
+                    value: 'MVP 1.3',
+                  ),
+                  SizedBox(height: 14),
+                  ProfileRow(
+                    icon: '💾',
+                    title: 'Storage',
+                    value: 'History + progress enabled',
+                  ),
+                  SizedBox(height: 14),
+                  ProfileRow(
+                    icon: '✨',
+                    title: 'AI Plan',
+                    value: 'Smart sorting enabled',
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          PrimaryButton(
-            text: 'Clear Local History',
-            onPressed: () async {
-              await LocalHistoryService.clearHistory();
+            const SizedBox(height: 18),
+            const DailyStatsCard(),
+            const SizedBox(height: 18),
+            PrimaryButton(
+              text: 'Clear Local History',
+              onPressed: () async {
+                await LocalHistoryService.clearHistory();
 
-              if (!context.mounted) return;
+                if (!context.mounted) return;
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Local history cleared.'),
-                ),
-              );
-            },
-          ),
-        ],
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Local history cleared.'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class DailyStatsCard extends StatelessWidget {
+  const DailyStatsCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DailyStats>(
+      future: LocalHistoryService.loadDailyStats(),
+      builder: (context, snapshot) {
+        final stats = snapshot.data ??
+            const DailyStats(
+              currentStreak: 0,
+              totalResets: 0,
+              completedDays: 0,
+              lastUsedDate: null,
+            );
+
+        return AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Daily Stats 🔥',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: darkText,
+                ),
+              ),
+              const SizedBox(height: 14),
+              ProfileRow(
+                icon: '🔥',
+                title: 'Current Streak',
+                value: '${stats.currentStreak} days',
+              ),
+              const SizedBox(height: 14),
+              ProfileRow(
+                icon: '🌿',
+                title: 'Total Resets',
+                value: '${stats.totalResets}',
+              ),
+              const SizedBox(height: 14),
+              ProfileRow(
+                icon: '✅',
+                title: 'Completed Days',
+                value: '${stats.completedDays}',
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -2123,7 +2266,11 @@ class _EveningReflectionScreenState extends State<EveningReflectionScreen> {
               PrimaryButton(
                 text: 'Finish Day',
                 enabled: canFinish,
-                onPressed: () {
+                onPressed: () async {
+                  await LocalHistoryService.markDayCompleted();
+
+                  if (!context.mounted) return;
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
