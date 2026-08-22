@@ -92,9 +92,10 @@ class SavedPlanEntry {
 
   factory SavedPlanEntry.fromJson(Map<String, dynamic> json) {
     return SavedPlanEntry(
-      id: json['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-          DateTime.now(),
+      id: json['id'] as String? ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
       mood: json['mood'] as String? ?? 'Okay',
       energy: json['energy'] as String? ?? 'Medium',
       focus: json['focus'] as String? ?? 'Personal',
@@ -109,6 +110,7 @@ class LocalHistoryService {
   static const String focusKey = 'last_focus';
   static const String brainDumpKey = 'last_brain_dump';
   static const String historyKey = 'saved_plan_history';
+  static const String plannerProgressPrefix = 'planner_progress_';
 
   static Future<void> saveSession({
     required String mood,
@@ -168,11 +170,66 @@ class LocalHistoryService {
 
   static Future<void> clearHistory() async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.remove(historyKey);
     await prefs.remove(moodKey);
     await prefs.remove(energyKey);
     await prefs.remove(focusKey);
     await prefs.remove(brainDumpKey);
+
+    final keys = prefs.getKeys();
+
+    for (final key in keys) {
+      if (key.startsWith(plannerProgressPrefix)) {
+        await prefs.remove(key);
+      }
+    }
+  }
+
+  static Future<void> savePlannerProgress({
+    required List<String> tasks,
+    required List<bool> completed,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _plannerProgressKey(tasks);
+
+    final values = completed.map((value) => value ? 'true' : 'false').toList();
+
+    await prefs.setStringList(key, values);
+  }
+
+  static Future<List<bool>?> loadPlannerProgress({
+    required List<String> tasks,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _plannerProgressKey(tasks);
+
+    final values = prefs.getStringList(key);
+
+    if (values == null) {
+      return null;
+    }
+
+    final completed = values.map((value) => value == 'true').toList();
+
+    if (completed.length == tasks.length) {
+      return completed;
+    }
+
+    if (completed.length > tasks.length) {
+      return completed.take(tasks.length).toList();
+    }
+
+    return [
+      ...completed,
+      ...List.generate(tasks.length - completed.length, (_) => false),
+    ];
+  }
+
+  static String _plannerProgressKey(List<String> tasks) {
+    final taskText = jsonEncode(tasks);
+    final encoded = base64Url.encode(utf8.encode(taskText));
+    return '$plannerProgressPrefix$encoded';
   }
 
   static Future<void> _addToHistory({
@@ -1116,13 +1173,13 @@ class ProfileTabContent extends StatelessWidget {
                 ProfileRow(
                   icon: '🌿',
                   title: 'App Version',
-                  value: 'MVP 1.1',
+                  value: 'MVP 1.2',
                 ),
                 SizedBox(height: 14),
                 ProfileRow(
                   icon: '💾',
                   title: 'Storage',
-                  value: 'Multiple history enabled',
+                  value: 'History + progress enabled',
                 ),
                 SizedBox(height: 14),
                 ProfileRow(
@@ -1136,14 +1193,16 @@ class ProfileTabContent extends StatelessWidget {
           const SizedBox(height: 18),
           PrimaryButton(
             text: 'Clear Local History',
-            onPressed: () {
-              LocalHistoryService.clearHistory().then((_) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Local history cleared.'),
-                  ),
-                );
-              });
+            onPressed: () async {
+              await LocalHistoryService.clearHistory();
+
+              if (!context.mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Local history cleared.'),
+                ),
+              );
             },
           ),
         ],
@@ -1763,6 +1822,28 @@ class _PlannerScreenState extends State<PlannerScreen> {
   void initState() {
     super.initState();
     completed = List.generate(widget.tasks.length, (_) => false);
+    loadSavedProgress();
+  }
+
+  Future<void> loadSavedProgress() async {
+    final saved = await LocalHistoryService.loadPlannerProgress(
+      tasks: widget.tasks,
+    );
+
+    if (!mounted || saved == null) {
+      return;
+    }
+
+    setState(() {
+      completed = saved;
+    });
+  }
+
+  Future<void> saveProgress() async {
+    await LocalHistoryService.savePlannerProgress(
+      tasks: widget.tasks,
+      completed: completed,
+    );
   }
 
   int get completedCount => completed.where((task) => task).length;
@@ -1848,6 +1929,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                               setState(() {
                                 completed[index] = value ?? false;
                               });
+
+                              saveProgress();
                             },
                           ),
                           const SizedBox(width: 8),
