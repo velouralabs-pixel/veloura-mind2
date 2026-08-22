@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -60,11 +62,53 @@ class LastSession {
   });
 }
 
+class SavedPlanEntry {
+  final String id;
+  final DateTime createdAt;
+  final String mood;
+  final String energy;
+  final String focus;
+  final String brainDumpText;
+
+  const SavedPlanEntry({
+    required this.id,
+    required this.createdAt,
+    required this.mood,
+    required this.energy,
+    required this.focus,
+    required this.brainDumpText,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'createdAt': createdAt.toIso8601String(),
+      'mood': mood,
+      'energy': energy,
+      'focus': focus,
+      'brainDumpText': brainDumpText,
+    };
+  }
+
+  factory SavedPlanEntry.fromJson(Map<String, dynamic> json) {
+    return SavedPlanEntry(
+      id: json['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      mood: json['mood'] as String? ?? 'Okay',
+      energy: json['energy'] as String? ?? 'Medium',
+      focus: json['focus'] as String? ?? 'Personal',
+      brainDumpText: json['brainDumpText'] as String? ?? '',
+    );
+  }
+}
+
 class LocalHistoryService {
   static const String moodKey = 'last_mood';
   static const String energyKey = 'last_energy';
   static const String focusKey = 'last_focus';
   static const String brainDumpKey = 'last_brain_dump';
+  static const String historyKey = 'saved_plan_history';
 
   static Future<void> saveSession({
     required String mood,
@@ -78,6 +122,14 @@ class LocalHistoryService {
     await prefs.setString(energyKey, energy);
     await prefs.setString(focusKey, focus);
     await prefs.setString(brainDumpKey, brainDumpText);
+
+    await _addToHistory(
+      prefs: prefs,
+      mood: mood,
+      energy: energy,
+      focus: focus,
+      brainDumpText: brainDumpText,
+    );
   }
 
   static Future<LastSession?> loadSession() async {
@@ -102,6 +154,77 @@ class LocalHistoryService {
       focus: focus,
       brainDumpText: brainDumpText,
     );
+  }
+
+  static Future<List<SavedPlanEntry>> loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawItems = prefs.getStringList(historyKey) ?? [];
+
+    final history = _decodeHistory(rawItems);
+    history.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return history;
+  }
+
+  static Future<void> clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(historyKey);
+    await prefs.remove(moodKey);
+    await prefs.remove(energyKey);
+    await prefs.remove(focusKey);
+    await prefs.remove(brainDumpKey);
+  }
+
+  static Future<void> _addToHistory({
+    required SharedPreferences prefs,
+    required String mood,
+    required String energy,
+    required String focus,
+    required String brainDumpText,
+  }) async {
+    final text = brainDumpText.trim();
+
+    if (text.isEmpty) {
+      return;
+    }
+
+    final existing = _decodeHistory(prefs.getStringList(historyKey) ?? []);
+
+    final newEntry = SavedPlanEntry(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      createdAt: DateTime.now(),
+      mood: mood,
+      energy: energy,
+      focus: focus,
+      brainDumpText: text,
+    );
+
+    final updated = [
+      newEntry,
+      ...existing,
+    ].take(25).toList();
+
+    final encoded = updated.map((entry) => jsonEncode(entry.toJson())).toList();
+
+    await prefs.setStringList(historyKey, encoded);
+  }
+
+  static List<SavedPlanEntry> _decodeHistory(List<String> rawItems) {
+    final entries = <SavedPlanEntry>[];
+
+    for (final raw in rawItems) {
+      try {
+        final decoded = jsonDecode(raw);
+
+        if (decoded is Map<String, dynamic>) {
+          entries.add(SavedPlanEntry.fromJson(decoded));
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+
+    return entries;
   }
 }
 
@@ -285,6 +408,35 @@ class _ScoredTask {
   final int score;
 
   const _ScoredTask(this.title, this.score);
+}
+
+String formatSavedAt(DateTime date) {
+  final now = DateTime.now();
+  final isToday =
+      date.year == now.year && date.month == now.month && date.day == now.day;
+
+  final yesterday = now.subtract(const Duration(days: 1));
+  final isYesterday = date.year == yesterday.year &&
+      date.month == yesterday.month &&
+      date.day == yesterday.day;
+
+  final hour = date.hour > 12
+      ? date.hour - 12
+      : date.hour == 0
+          ? 12
+          : date.hour;
+  final minute = date.minute.toString().padLeft(2, '0');
+  final period = date.hour >= 12 ? 'PM' : 'AM';
+
+  if (isToday) {
+    return 'Today at $hour:$minute $period';
+  }
+
+  if (isYesterday) {
+    return 'Yesterday at $hour:$minute $period';
+  }
+
+  return '${date.month}/${date.day}/${date.year} at $hour:$minute $period';
 }
 
 class AppShell extends StatelessWidget {
@@ -763,10 +915,10 @@ class HistoryTabContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: FutureBuilder<LastSession?>(
-        future: LocalHistoryService.loadSession(),
+      child: FutureBuilder<List<SavedPlanEntry>>(
+        future: LocalHistoryService.loadHistory(),
         builder: (context, snapshot) {
-          final session = snapshot.data;
+          final history = snapshot.data ?? [];
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -782,14 +934,14 @@ class HistoryTabContent extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Your most recent saved reset.',
+                'Your saved resets and plans.',
                 style: TextStyle(fontSize: 16, color: softText),
               ),
               const SizedBox(height: 24),
-              if (session == null)
+              if (history.isEmpty)
                 AppCard(
                   child: const Text(
-                    'No saved history yet. Complete one Brain Dump and your last plan will show here.',
+                    'No saved history yet. Complete one Brain Dump and your plans will show here.',
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.45,
@@ -797,67 +949,112 @@ class HistoryTabContent extends StatelessWidget {
                     ),
                   ),
                 )
-              else ...[
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Last Saved Plan',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: darkText,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      InfoChip(label: 'Mood: ${session.mood}'),
-                      const SizedBox(height: 8),
-                      InfoChip(label: 'Energy: ${session.energy}'),
-                      const SizedBox(height: 8),
-                      InfoChip(label: 'Focus: ${session.focus}'),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Brain Dump',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: darkText,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        session.brainDumpText,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.4,
-                          color: softText,
-                        ),
-                      ),
-                    ],
+              else
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: history.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 14),
+                    itemBuilder: (context, index) {
+                      return HistoryPlanCard(entry: history[index]);
+                    },
                   ),
                 ),
-                const SizedBox(height: 16),
-                PrimaryButton(
-                  text: 'Open Last Plan',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => YourPlanScreen(
-                          mood: session.mood,
-                          energy: session.energy,
-                          focus: session.focus,
-                          brainDumpText: session.brainDumpText,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class HistoryPlanCard extends StatelessWidget {
+  final SavedPlanEntry entry;
+
+  const HistoryPlanCard({
+    super.key,
+    required this.entry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = SmartPlanService.buildPlan(
+      brainDumpText: entry.brainDumpText,
+      mood: entry.mood,
+      energy: entry.energy,
+      focus: entry.focus,
+    );
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            formatSavedAt(entry.createdAt),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: sage,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${entry.focus} • ${entry.mood} • ${entry.energy}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Top 3',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...plan.topThree.map(
+            (task) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                '• $task',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: softText,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => YourPlanScreen(
+                      mood: entry.mood,
+                      energy: entry.energy,
+                      focus: entry.focus,
+                      brainDumpText: entry.brainDumpText,
+                    ),
+                  ),
+                );
+              },
+              child: const Text(
+                'Open Plan',
+                style: TextStyle(
+                  color: darkText,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -919,13 +1116,13 @@ class ProfileTabContent extends StatelessWidget {
                 ProfileRow(
                   icon: '🌿',
                   title: 'App Version',
-                  value: 'MVP 1.0',
+                  value: 'MVP 1.1',
                 ),
                 SizedBox(height: 14),
                 ProfileRow(
                   icon: '💾',
                   title: 'Storage',
-                  value: 'Local history enabled',
+                  value: 'Multiple history enabled',
                 ),
                 SizedBox(height: 14),
                 ProfileRow(
@@ -935,6 +1132,19 @@ class ProfileTabContent extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 18),
+          PrimaryButton(
+            text: 'Clear Local History',
+            onPressed: () {
+              LocalHistoryService.clearHistory().then((_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Local history cleared.'),
+                  ),
+                );
+              });
+            },
           ),
         ],
       ),
